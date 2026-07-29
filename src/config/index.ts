@@ -11,7 +11,7 @@ export const config = {
 
   api: {
     baseUrl: 'https://api.zstlab.cyou',
-    key: process.env.ZST_API_KEY || '',
+    key: process.env.ZST_API_KEY || 'zst_v4GBeAXhssVr3NdCUhLI9p1ZMZlO8BoTzCyQCHS1',
     timeout: 15000,
     retryCount: 3,
     retryDelay: 1000,

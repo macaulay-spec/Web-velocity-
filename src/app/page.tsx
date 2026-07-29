@@ -83,7 +83,7 @@ export default function HomePage() {
             <h1 className="text-2xl font-bold text-white mb-3">Unable to Load Content</h1>
             <p className="text-zinc-400 mb-4">{error}</p>
             <p className="text-xs text-zinc-600 mb-6">
-              If you&apos;re the site owner, make sure the <code className="text-jagflix-400 bg-zinc-900 px-1.5 py-0.5 rounded">ZST_API_KEY</code> environment variable is set in your Vercel project dashboard.
+              The API might be temporarily unavailable. Please try again in a moment.
             </p>
             <button
               onClick={() => window.location.reload()}

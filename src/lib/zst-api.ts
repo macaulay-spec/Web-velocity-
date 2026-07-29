@@ -2,7 +2,9 @@
 // Centralized API client for ZST Labs to avoid duplication across route handlers
 
 const ZST_API = 'https://api.zstlab.cyou';
-const API_KEY = process.env.ZST_API_KEY || '';
+
+// API key embedded for direct deployment — environment variable takes precedence
+const API_KEY = process.env.ZST_API_KEY || 'zst_v4GBeAXhssVr3NdCUhLI9p1ZMZlO8BoTzCyQCHS1';
 
 export class ZSTError extends Error {
   constructor(
@@ -36,7 +38,7 @@ export async function fetchZST<T = unknown>(
 
   if (!isApiKeyConfigured()) {
     throw new ZSTError(
-      'ZST API key is not configured. Set ZST_API_KEY environment variable.',
+      'ZST API key is missing or invalid.',
       503
     );
   }
