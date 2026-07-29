@@ -22,19 +22,38 @@ export default function HomePage() {
         setLoading(true);
         setError(null);
 
-        const [homepageRes, trendingRes, hotRes] = await Promise.all([
-          fetch('/api/homepage'),
-          fetch('/api/trending'),
-          fetch('/api/hot-movies-series'),
+        const results = await Promise.allSettled([
+          fetch('/api/homepage').then(r => r.json()),
+          fetch('/api/trending').then(r => r.json()),
+          fetch('/api/hot-movies-series').then(r => r.json()),
         ]);
 
-        const homepageJson = await homepageRes.json();
-        const trendingJson = await trendingRes.json();
-        const hotJson = await hotRes.json();
+        // Homepage
+        if (results[0].status === 'fulfilled' && results[0].value?.data) {
+          setHomepageData(results[0].value.data);
+        }
 
-        if (homepageJson.data) setHomepageData(homepageJson.data);
-        if (trendingJson.data) setTrending(trendingJson.data);
-        if (hotJson.data) setHotContent(hotJson.data);
+        // Trending
+        if (results[1].status === 'fulfilled' && results[1].value?.data) {
+          setTrending(results[1].value.data);
+        }
+
+        // Hot content
+        if (results[2].status === 'fulfilled' && results[2].value?.data) {
+          setHotContent(results[2].value.data);
+        }
+
+        // Check if ALL failed
+        const allFailed = results.every(
+          r => r.status === 'rejected' || !r.value?.data
+        );
+        if (allFailed) {
+          const firstError = results.find(r => r.status === 'rejected');
+          setError(firstError
+            ? 'Failed to load content. Please check your API configuration.'
+            : 'No content available. Make sure ZST_API_KEY is set in environment variables.'
+          );
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load content');
       } finally {
@@ -53,7 +72,7 @@ export default function HomePage() {
     );
   }
 
-  if (error && !homepageData) {
+  if (error && !homepageData && !trending.length && !hotContent.length) {
     return (
       <MainLayout>
         <div className="min-h-screen flex items-center justify-center">
@@ -62,7 +81,10 @@ export default function HomePage() {
               <span className="text-white font-black text-3xl -rotate-45">J</span>
             </div>
             <h1 className="text-2xl font-bold text-white mb-3">Unable to Load Content</h1>
-            <p className="text-zinc-400 mb-6">{error}</p>
+            <p className="text-zinc-400 mb-4">{error}</p>
+            <p className="text-xs text-zinc-600 mb-6">
+              If you&apos;re the site owner, make sure the <code className="text-jagflix-400 bg-zinc-900 px-1.5 py-0.5 rounded">ZST_API_KEY</code> environment variable is set in your Vercel project dashboard.
+            </p>
             <button
               onClick={() => window.location.reload()}
               className="px-6 py-3 bg-jagflix-500 hover:bg-jagflix-600 text-white rounded-xl transition-colors"
@@ -84,7 +106,6 @@ export default function HomePage() {
 
       {/* Content Sections */}
       <div className="relative z-10 -mt-32 space-y-4 pb-16">
-        {/* Continue Watching */}
         {homepageData?.sections?.map((section) => (
           <ContentRow
             key={section.id}
@@ -94,26 +115,15 @@ export default function HomePage() {
           />
         ))}
 
-        {/* Trending */}
         {trending.length > 0 && (
-          <ContentRow
-            title="Trending Now"
-            items={trending}
-            viewAllHref="/trending"
-          />
+          <ContentRow title="Trending Now" items={trending} viewAllHref="/trending" />
         )}
 
-        {/* Hot Content */}
         {hotContent.length > 0 && (
-          <ContentRow
-            title="Popular on JagFlix"
-            items={hotContent}
-            viewAllHref="/popular"
-          />
+          <ContentRow title="Popular on JagFlix" items={hotContent} viewAllHref="/popular" />
         )}
       </div>
 
-      {/* Footer Note */}
       <div className="text-center pb-8">
         <motion.p
           initial={{ opacity: 0 }}
