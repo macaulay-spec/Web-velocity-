@@ -1,366 +1,188 @@
-// ─── Watch / Player Page ───────────────────────────────────────────────
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { MainLayout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/features/loading-spinner';
-import { usePlayerStore } from '@/store/player.store';
 import { formatTime } from '@/lib/utils';
-import { KEYBOARD_SHORTCUTS } from '@/constants';
 import {
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  Maximize,
-  Minimize,
-  PictureInPicture2,
-  Subtitles,
-  Settings,
-  SkipBack,
-  SkipForward,
-  ChevronLeft,
-  Film,
+  Play, Pause, Volume2, VolumeX, Maximize, Minimize,
+  PictureInPicture2, Subtitles, SkipBack, SkipForward, ChevronLeft,
 } from 'lucide-react';
-import type { MediaData, ItemDetails } from '@/types/api';
 
 export default function WatchPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const id = params.id as string;
-  const season = searchParams.get('season');
-  const episode = searchParams.get('episode');
 
-  const [details, setDetails] = useState<ItemDetails | null>(null);
-  const [media, setMedia] = useState<MediaData | null>(null);
+  const [media, setMedia] = useState<any>(null);
+  const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [isBuffering, setIsBuffering] = useState(true);
+  const [buffering, setBuffering] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Load media
   useEffect(() => {
     if (!id) return;
+    Promise.all([
+      fetch(`/api/media?id=${id}`).then(r => r.json()),
+      fetch(`/api/item-details?id=${id}`).then(r => r.json()),
+    ]).then(([m, d]) => {
+      if (m?.data) setMedia(m.data);
+      if (d?.data) setDetails(d.data);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [id]);
 
-    async function load() {
-      try {
-        setLoading(true);
-        const params = new URLSearchParams({ id });
-        if (season) params.set('season', season);
-        if (episode) params.set('episode', episode);
-
-        const [detailsRes, mediaRes] = await Promise.all([
-          fetch(`/api/item-details?id=${id}`),
-          fetch(`/api/media?${params.toString()}`),
-        ]);
-
-        const detailsJson = await detailsRes.json();
-        const mediaJson = await mediaRes.json();
-
-        if (detailsJson.data) setDetails(detailsJson.data);
-        if (mediaJson.data) setMedia(mediaJson.data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load');
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [id, season, episode]);
-
-  // Auto-hide controls
-  const resetControlsTimeout = useCallback(() => {
-    setShowControls(true);
-    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) setShowControls(false);
-    }, 3000);
-  }, [isPlaying]);
-
-  useEffect(() => {
-    resetControlsTimeout();
-    return () => {
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    };
-  }, [isPlaying, resetControlsTimeout]);
-
-  // Player controls
   const togglePlay = useCallback(() => {
-    if (!videoRef.current) return;
-    if (videoRef.current.paused) {
-      videoRef.current.play();
-      setIsPlaying(true);
-    } else {
-      videoRef.current.pause();
-      setIsPlaying(false);
-    }
-    resetControlsTimeout();
-  }, [resetControlsTimeout]);
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) { v.play(); setPlaying(true); }
+    else { v.pause(); setPlaying(false); }
+  }, []);
 
   const toggleMute = useCallback(() => {
     if (!videoRef.current) return;
     videoRef.current.muted = !videoRef.current.muted;
-    setIsMuted(videoRef.current.muted);
-    resetControlsTimeout();
-  }, [resetControlsTimeout]);
+    setMuted(videoRef.current.muted);
+  }, []);
 
-  const toggleFullscreen = useCallback(() => {
+  const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen();
-      setIsFullscreen(true);
+      await containerRef.current.requestFullscreen();
+      setFullscreen(true);
     } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
+      await document.exitFullscreen();
+      setFullscreen(false);
     }
-    resetControlsTimeout();
-  }, [resetControlsTimeout]);
+  }, []);
 
-  const seek = useCallback((seconds: number) => {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.currentTime + seconds, videoRef.current.duration));
-    resetControlsTimeout();
-  }, [resetControlsTimeout]);
-
-  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseFloat(e.target.value);
-    if (videoRef.current) {
-      videoRef.current.volume = newVolume;
-      videoRef.current.muted = newVolume === 0;
-    }
-    setVolume(newVolume);
-    setIsMuted(newVolume === 0);
+  const seek = useCallback((s: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = Math.max(0, Math.min(v.currentTime + s, v.duration));
   }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      if ((KEYBOARD_SHORTCUTS.TOGGLE_PLAY as readonly string[]).includes(e.key)) {
-        e.preventDefault();
-        togglePlay();
-      } else if ((KEYBOARD_SHORTCUTS.FULLSCREEN as readonly string[]).includes(e.key)) {
-        e.preventDefault();
-        toggleFullscreen();
-      } else if ((KEYBOARD_SHORTCUTS.MUTE as readonly string[]).includes(e.key)) {
-        e.preventDefault();
-        toggleMute();
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        seek(10);
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        seek(-10);
-      }
+      if (e.key === ' ' || e.key === 'k') { e.preventDefault(); togglePlay(); }
+      if (e.key === 'f') { e.preventDefault(); toggleFullscreen(); }
+      if (e.key === 'm') { e.preventDefault(); toggleMute(); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); seek(10); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); seek(-10); }
     };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [togglePlay, toggleFullscreen, toggleMute, seek]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black">
-        <LoadingSpinner fullScreen text="Preparing your stream..." />
-      </div>
-    );
-  }
+  // Auto-hide controls
+  useEffect(() => {
+    if (!playing) { setShowControls(true); return; }
+    const t = setTimeout(() => setShowControls(false), 3000);
+    return () => clearTimeout(t);
+  }, [playing, currentTime]);
 
-  if (error || !media) {
-    return (
-      <MainLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-white mb-3">Playback Error</h1>
-            <p className="text-zinc-400 mb-6">{error || 'Unable to load media.'}</p>
-            <Link href="/"><Button>Go Home</Button></Link>
-          </div>
-        </div>
-      </MainLayout>
-    );
-  }
+  if (loading) return <div className="h-screen bg-black"><LoadingSpinner fullScreen text="Loading stream..." /></div>;
 
-  const primarySource = media.sources?.[0];
-  const title = details?.title || 'Loading...';
-  const episodesTitle = episode ? `S${season}:E${episode}` : '';
+  const src = media?.sources?.[0]?.url || 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
 
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full h-screen bg-black overflow-hidden"
-      onMouseMove={resetControlsTimeout}
-      onClick={resetControlsTimeout}
+    <div ref={containerRef} className="relative w-full h-screen bg-black overflow-hidden"
+      onMouseMove={() => { setShowControls(true); }}
+      onMouseLeave={() => { if (playing) setShowControls(false); }}
     >
-      {/* Video Element */}
-      {primarySource && (
-        <video
-          ref={videoRef}
-          className="w-full h-full object-contain"
-          src={primarySource.url}
-          onTimeUpdate={() => {
-            if (videoRef.current) {
-              setCurrentTime(videoRef.current.currentTime);
-              setDuration(videoRef.current.duration);
-            }
-          }}
-          onLoadedMetadata={() => {
-            if (videoRef.current) {
-              setDuration(videoRef.current.duration);
-              setIsBuffering(false);
-            }
-          }}
-          onWaiting={() => setIsBuffering(true)}
-          onPlaying={() => setIsBuffering(false)}
-          onEnded={() => setIsPlaying(false)}
-          onClick={togglePlay}
-          playsInline
-          autoPlay
-        />
-      )}
+      <video ref={videoRef} className="w-full h-full object-contain cursor-pointer"
+        src={src}
+        onTimeUpdate={() => { if (videoRef.current) { setCurrentTime(videoRef.current.currentTime); setDuration(videoRef.current.duration); }}}
+        onLoadedMetadata={() => { if (videoRef.current) { setDuration(videoRef.current.duration); setBuffering(false); }}}
+        onWaiting={() => setBuffering(true)}
+        onPlaying={() => { setBuffering(false); setPlaying(true); }}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onClick={togglePlay}
+        playsInline
+        autoPlay
+      />
 
-      {/* Buffering Indicator */}
-      {isBuffering && (
+      {/* Buffering */}
+      {buffering && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
           <div className="flex flex-col items-center gap-4">
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 border-4 border-zinc-800 rounded-full" />
-              <div className="absolute inset-0 border-4 border-transparent border-t-jagflix-500 rounded-full animate-spin" />
-            </div>
+            <div className="w-12 h-12 border-4 border-zinc-800 border-t-jagflix-500 rounded-full animate-spin" />
             <p className="text-sm text-zinc-400">Buffering...</p>
           </div>
         </div>
       )}
 
-      {/* Top Gradient + Back Button */}
-      <div className={`absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-6 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      {/* Top bar */}
+      <div className={`absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/80 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-4">
           <Link href={details ? (details.type === 'series' ? `/series/${id}` : `/movie/${id}`) : '/'}>
-            <Button variant="ghost" size="iconSm">
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
+            <Button variant="ghost" size="iconSm"><ChevronLeft className="w-5 h-5" /></Button>
           </Link>
-          <div>
-            <h1 className="text-lg font-semibold text-white">{title}</h1>
-            {episodesTitle && <p className="text-sm text-zinc-400">{episodesTitle}</p>}
-          </div>
+          <h1 className="text-lg font-semibold text-white">{details?.title || 'Playing'}</h1>
         </div>
       </div>
 
-      {/* Center Play Button (when paused) */}
-      {!isPlaying && !isBuffering && (
+      {/* Center play button */}
+      {!playing && !buffering && (
         <div className="absolute inset-0 flex items-center justify-center cursor-pointer" onClick={togglePlay}>
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-20 h-20 rounded-full bg-jagflix-500/90 flex items-center justify-center shadow-2xl shadow-jagflix-500/30"
-          >
+          <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="w-20 h-20 rounded-full bg-jagflix-500/90 flex items-center justify-center shadow-2xl">
             <Play className="w-8 h-8 text-white fill-white ml-1" />
           </motion.div>
         </div>
       )}
 
-      {/* Bottom Controls */}
-      <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 pt-16 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        {/* Progress Bar */}
-        <div className="mb-4">
-          <input
-            type="range"
-            min={0}
-            max={duration || 100}
-            value={currentTime}
-            onChange={(e) => {
-              if (videoRef.current) {
-                videoRef.current.currentTime = parseFloat(e.target.value);
-              }
-              setCurrentTime(parseFloat(e.target.value));
-            }}
-            className="w-full h-1.5 appearance-none bg-zinc-700 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-jagflix-500 [&::-webkit-slider-thumb]:shadow-lg"
-          />
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-zinc-400">{formatTime(currentTime)}</span>
-            <span className="text-xs text-zinc-400">{formatTime(duration)}</span>
-          </div>
+      {/* Bottom controls */}
+      <div className={`absolute bottom-0 left-0 right-0 p-6 pt-16 bg-gradient-to-t from-black/80 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <input type="range" min={0} max={duration || 100} value={currentTime}
+          onChange={(e) => { if (videoRef.current) videoRef.current.currentTime = parseFloat(e.target.value); }}
+          className="w-full h-1.5 appearance-none bg-zinc-700 rounded-full cursor-pointer mb-2
+            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+            [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-jagflix-500 [&::-webkit-slider-thumb]:shadow-lg"
+        />
+        <div className="flex justify-between text-xs text-zinc-400 mb-4">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
         </div>
-
-        {/* Controls Row */}
         <div className="flex items-center gap-3">
-          {/* Play/Pause */}
-          <button onClick={togglePlay} className="p-2 text-white hover:text-jagflix-400 transition-colors">
-            {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 fill-white" />}
+          <button onClick={togglePlay} className="p-2 text-white hover:text-jagflix-400">
+            {playing ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 fill-white" />}
           </button>
-
-          {/* Skip Back */}
-          <button onClick={() => seek(-10)} className="p-2 text-zinc-400 hover:text-white transition-colors">
-            <SkipBack className="w-5 h-5" />
-          </button>
-
-          {/* Skip Forward */}
-          <button onClick={() => seek(10)} className="p-2 text-zinc-400 hover:text-white transition-colors">
-            <SkipForward className="w-5 h-5" />
-          </button>
-
-          {/* Volume */}
-          <div className="flex items-center gap-2">
-            <button onClick={toggleMute} className="p-2 text-zinc-400 hover:text-white transition-colors">
-              {isMuted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          <button onClick={() => seek(-10)} className="p-2 text-zinc-400 hover:text-white"><SkipBack className="w-5 h-5" /></button>
+          <button onClick={() => seek(10)} className="p-2 text-zinc-400 hover:text-white"><SkipForward className="w-5 h-5" /></button>
+          <div className="flex items-center gap-2 ml-2">
+            <button onClick={toggleMute} className="p-2 text-zinc-400 hover:text-white">
+              {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={volume}
-              onChange={handleVolumeChange}
-              className="w-20 h-1 appearance-none bg-zinc-700 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+            <input type="range" min={0} max={1} step={0.05} defaultValue={1}
+              onChange={(e) => { const v = parseFloat(e.target.value); if (videoRef.current) { videoRef.current.volume = v; videoRef.current.muted = v === 0; } setVolume(v); }}
+              className="w-20 h-1 appearance-none bg-zinc-700 rounded-full cursor-pointer
+                [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
+                [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
             />
           </div>
-
-          {/* Spacer */}
           <div className="flex-1" />
-
-          {/* Subtitle */}
-          {media.subtitles && media.subtitles.length > 0 && (
-            <button className="p-2 text-zinc-400 hover:text-white transition-colors">
-              <Subtitles className="w-5 h-5" />
-            </button>
+          {media?.subtitles?.length > 0 && (
+            <button className="p-2 text-zinc-400 hover:text-white"><Subtitles className="w-5 h-5" /></button>
           )}
-
-          {/* Picture in Picture */}
-          <button
-            onClick={async () => {
-              try {
-                if (videoRef.current && document.pictureInPictureElement !== videoRef.current) {
-                  await videoRef.current.requestPictureInPicture();
-                } else {
-                  await document.exitPictureInPicture();
-                }
-              } catch {
-                // PiP not supported
-              }
-            }}
-            className="p-2 text-zinc-400 hover:text-white transition-colors"
-          >
-            <PictureInPicture2 className="w-5 h-5" />
-          </button>
-
-          {/* Fullscreen */}
-          <button onClick={toggleFullscreen} className="p-2 text-zinc-400 hover:text-white transition-colors">
-            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+          <button onClick={async () => { try { if (videoRef.current && document.pictureInPictureElement !== videoRef.current) await videoRef.current.requestPictureInPicture(); else await document.exitPictureInPicture(); } catch {} }}
+            className="p-2 text-zinc-400 hover:text-white"><PictureInPicture2 className="w-5 h-5" /></button>
+          <button onClick={toggleFullscreen} className="p-2 text-zinc-400 hover:text-white">
+            {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
           </button>
         </div>
       </div>

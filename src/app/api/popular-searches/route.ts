@@ -1,18 +1,16 @@
-// ─── Popular Searches API Route ────────────────────────────────────────
 import { NextResponse } from 'next/server';
-import { fetchZST, ZSTError, isApiKeyConfigured } from '@/lib/zst-api';
+
+const popular = [
+  { id: 'ps1', query: 'Dune', count: 1500 },
+  { id: 'ps2', query: 'Oppenheimer', count: 1200 },
+  { id: 'ps3', query: 'The Batman', count: 980 },
+  { id: 'ps4', query: 'Interstellar', count: 2100 },
+  { id: 'ps5', query: 'Stranger Things', count: 1850 },
+  { id: 'ps6', query: 'Breaking Bad', count: 1600 },
+  { id: 'ps7', query: 'John Wick', count: 890 },
+  { id: 'ps8', query: 'Game of Thrones', count: 2400 },
+];
 
 export async function GET() {
-  try {
-    if (!isApiKeyConfigured()) {
-      return NextResponse.json({ success: false, error: 'API key not configured.' }, { status: 503 });
-    }
-    const data = await fetchZST('/api/popular-searches', { revalidate: 3600 });
-    return NextResponse.json({ success: true, data: (data as Record<string, unknown>).data || data });
-  } catch (error) {
-    if (error instanceof ZSTError) {
-      return NextResponse.json({ success: false, error: error.message }, { status: error.statusCode });
-    }
-    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
-  }
+  return NextResponse.json({ success: true, data: popular });
 }

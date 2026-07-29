@@ -1,27 +1,19 @@
-// ─── Auth Provider ─────────────────────────────────────────────────────
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
 import { useAuthStore } from '@/store/auth.store';
-import { getSession } from '@/services/auth.service';
+import { STORAGE_KEYS } from '@/constants';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { setUser, setError, logout } = useAuthStore();
+  const { setUser, logout } = useAuthStore();
 
   useEffect(() => {
-    async function init() {
-      try {
-        const user = await getSession();
-        if (user) {
-          setUser(user);
-        } else {
-          logout();
-        }
-      } catch {
-        logout();
-      }
-    }
-    init();
+    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) { logout(); return; }
+    fetch('/api/auth/session', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(data => { if (data?.id) setUser(data); else logout(); })
+      .catch(() => logout());
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return <>{children}</>;

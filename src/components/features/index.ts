@@ -1,10 +1,7 @@
 export { HeroBanner } from './hero-banner';
-export { MovieCard } from './movie-card';
 export { ContentRow } from './content-row';
 export { SearchOverlay } from './search-overlay';
-export { CastCarousel } from './cast-carousel';
 export { SeasonSelector } from './season-selector';
-export { RatingStars } from './rating-stars';
-export { GenreBadges } from './genre-badges';
 export { LoadingSpinner } from './loading-spinner';
 export { AppIcon } from './app-icon';
+export { ServiceWorkerRegister } from './service-worker-register';

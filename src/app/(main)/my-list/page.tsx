@@ -1,91 +1,55 @@
-// ─── My List Page ─────────────────────────────────────────────────────
 'use client';
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MainLayout } from '@/components/layout';
-import { MovieCard } from '@/components/features/movie-card';
-import { LoadingSpinner } from '@/components/features/loading-spinner';
-import { Heart, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import type { WatchlistItem } from '@/types/api';
+import Image from 'next/image';
+import { MainLayout } from '@/components/layout';
+import { LoadingSpinner } from '@/components/features/loading-spinner';
+import { getImageUrl, formatRating } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Heart, Star } from 'lucide-react';
 
 export default function MyListPage() {
-  const [items, setItems] = useState<WatchlistItem[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      try {
-        setLoading(true);
-        const res = await fetch('/api/watchlist?userId=demo');
-        const data = await res.json();
-        setItems(data || []);
-      } catch {
-        setItems([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    fetch('/api/watchlist?userId=demo').then(r => r.json())
+      .then(d => setItems(d || []))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
     <MainLayout>
       <div className="pt-24 pb-16 min-h-screen">
         <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-4 mb-8"
-          >
-            <Link href="/" className="p-2 rounded-xl hover:bg-white/5 transition-colors">
-              <ArrowLeft className="w-5 h-5 text-zinc-400" />
-            </Link>
-            <div>
-              <h1 className="text-3xl lg:text-4xl font-bold text-white">My List</h1>
-              <p className="text-zinc-500 mt-1">Your saved movies and series</p>
-            </div>
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+            <h1 className="text-3xl lg:text-4xl font-bold text-white mb-2">My List</h1>
+            <p className="text-zinc-500 mb-8">Your saved movies and series</p>
           </motion.div>
 
-          {loading ? (
-            <LoadingSpinner text="Loading your list..." />
-          ) : items.length > 0 ? (
+          {loading ? <LoadingSpinner text="Loading..." /> :
+           items.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {items.map((item, index) => (
-                <MovieCard
-                  key={item.id}
-                  item={{
-                    id: item.itemId,
-                    title: item.title,
-                    type: item.itemType,
-                    poster: item.poster,
-                    backdrop: item.backdrop,
-                    rating: item.rating,
-                    year: item.year,
-                  }}
-                  index={index}
-                />
+              {items.map((item: any) => (
+                <Link key={item.id} href={item.itemType === 'movie' ? `/movie/${item.itemId}` : `/series/${item.itemId}`} className="group">
+                  <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-zinc-900">
+                    <Image src={getImageUrl(item.poster)} alt={item.title} fill className="object-cover transition-all group-hover:scale-110" sizes="200px" />
+                    {item.rating && <Badge variant="default" size="sm" className="absolute top-2 left-2"><Star className="w-3 h-3 fill-jagflix-500" />{formatRating(item.rating)}</Badge>}
+                  </div>
+                  <p className="text-sm text-white mt-2 truncate group-hover:text-jagflix-400">{item.title}</p>
+                </Link>
               ))}
             </div>
           ) : (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-20"
-            >
+            <div className="text-center py-20">
               <Heart className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-zinc-500">Your list is empty</h3>
-              <p className="text-zinc-700 mt-2 mb-6">
-                Add movies and series to your watchlist
-              </p>
-              <Link
-                href="/browse"
-                className="inline-flex items-center px-6 py-3 bg-jagflix-500 hover:bg-jagflix-600 text-white rounded-xl transition-colors"
-              >
-                Browse Content
-              </Link>
-            </motion.div>
+              <p className="text-zinc-700 mt-2 mb-6">Add movies and series to your watchlist</p>
+              <Link href="/browse" className="inline-flex items-center px-6 py-3 bg-jagflix-500 hover:bg-jagflix-600 text-white rounded-xl transition-colors">Browse Content</Link>
+            </div>
           )}
         </div>
       </div>
