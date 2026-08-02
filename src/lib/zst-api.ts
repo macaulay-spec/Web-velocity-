@@ -37,40 +37,42 @@ async function fetchZST(endpoint: string, options: { params?: Record<string, str
 export async function getHomepageData() {
   try {
     const data = await fetchZST('/api/homepage', { revalidate: 300 });
-    return { hero: data?.hero || sampleHomepage.hero, sections: data?.sections || sampleHomepage.sections };
+    const hero = (Array.isArray(data?.hero) && data.hero.length > 0) ? data.hero : sampleHomepage.hero;
+    const sections = (Array.isArray(data?.sections) && data.sections.length > 0) ? data.sections : sampleHomepage.sections;
+    return { hero, sections };
   } catch { return sampleHomepage; }
 }
 
 export async function getTrendingData() {
-  try { const d = await fetchZST('/api/trending', { revalidate: 600 }); return Array.isArray(d) ? d : sampleTrending; }
+  try { const d = await fetchZST('/api/trending', { revalidate: 600 }); return (Array.isArray(d) && d.length > 0) ? d : sampleTrending; }
   catch { return sampleTrending; }
 }
 
 export async function getHotContentData() {
-  try { const d = await fetchZST('/api/hot-movies-series', { revalidate: 600 }); return Array.isArray(d) ? d : sampleHotContent; }
+  try { const d = await fetchZST('/api/hot-movies-series', { revalidate: 600 }); return (Array.isArray(d) && d.length > 0) ? d : sampleHotContent; }
   catch { return sampleHotContent; }
 }
 
 export async function getItemDetailsData(id: string) {
   const sample = getSampleDetails(id) || {};
-  try { const d = await fetchZST('/api/item-details', { params: { id }, revalidate: 86400 }); return d || sample; }
+  try { const d = await fetchZST('/api/item-details', { params: { id }, revalidate: 86400 }); return (d && Object.keys(d).length > 0) ? d : sample; }
   catch { return sample; }
 }
 
 export async function getMediaData(id: string, season?: string, episode?: string) {
-  try { const d = await fetchZST('/api/media', { params: { id, season, episode }, revalidate: 86400 }); return d || sampleMedia; }
+  try { const d = await fetchZST('/api/media', { params: { id, season, episode }, revalidate: 86400 }); return (d && d.sources && d.sources.length > 0) ? d : sampleMedia; }
   catch { return sampleMedia; }
 }
 
 export async function getRecommendationsData(id: string) {
-  try { const d = await fetchZST('/api/recommendations', { params: { id }, revalidate: 1800 }); return Array.isArray(d) ? d : sampleRecommendations; }
+  try { const d = await fetchZST('/api/recommendations', { params: { id }, revalidate: 1800 }); return (Array.isArray(d) && d.length > 0) ? d : sampleRecommendations; }
   catch { return sampleRecommendations; }
 }
 
 export async function searchContentData(query: string, type?: string) {
   try {
     const d = await fetchZST('/api/search', { params: { query, type: type !== 'all' ? type : undefined, page: '1' }, revalidate: 300 });
-    const items = Array.isArray(d) ? d : [];
+    const items = (Array.isArray(d) && d.length > 0) ? d : sampleSearchResults.filter(i => i.title.toLowerCase().includes(query.toLowerCase()));
     return { data: items, hasMore: items.length > 10 };
   } catch {
     const filtered = sampleSearchResults.filter(i => i.title.toLowerCase().includes(query.toLowerCase()));
@@ -79,6 +81,6 @@ export async function searchContentData(query: string, type?: string) {
 }
 
 export async function getFootballData() {
-  try { const d = await fetchZST('/api/football', { revalidate: 60 }); return Array.isArray(d) ? d : sampleFootball; }
+  try { const d = await fetchZST('/api/football', { revalidate: 60 }); return (Array.isArray(d) && d.length > 0) ? d : sampleFootball; }
   catch { return sampleFootball; }
 }
